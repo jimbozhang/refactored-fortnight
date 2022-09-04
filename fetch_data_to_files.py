@@ -33,7 +33,7 @@ def update_historical_cache(stock_ids: pd.Series, out_csv_dir: Path, num_jobs: i
 
     with ThreadPoolExecutor(max_workers=num_jobs) as executor:
         for id in stock_ids:
-            stock_id = re.sub(r'^[a-z]+', '', id),
+            stock_id = re.sub(r'^[a-z]+', '', id)
             out_csv_path = out_csv_dir / f'{id}.csv'
             executor.submit(fecth_and_write_stock_info, stock_id, out_csv_path)
 
@@ -41,4 +41,4 @@ def update_historical_cache(stock_ids: pd.Series, out_csv_dir: Path, num_jobs: i
 if __name__ == '__main__':
     Path.mkdir(ROOT_DIR, exist_ok=True)
     ids = fetch_stock_ids(STOCK_IDS_CSV)
-    update_historical_cache(ids, VOL_CSVS_DIR, num_jobs=100)
+    update_historical_cache(ids, VOL_CSVS_DIR, num_jobs=200)
