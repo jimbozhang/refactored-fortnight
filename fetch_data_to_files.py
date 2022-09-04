@@ -6,9 +6,7 @@ from pathlib import Path
 import akshare as ak
 import pandas as pd
 
-ROOT_DIR = Path('data')
-STOCK_IDS_CSV = ROOT_DIR / 'stocks.csv'
-VOL_CSVS_DIR = ROOT_DIR / 'volumes'
+from paths import ROOT_DIR, STOCK_IDS_CSV, VOL_CSVS_DIR
 
 
 def stock_ids_to_csv(out_csv_path: Path) -> None:
@@ -19,11 +17,11 @@ def stock_ids_to_csv(out_csv_path: Path) -> None:
 def fetch_stock_ids(csv_path: Path, force_update_csv=False) -> pd.DataFrame:
     if force_update_csv or not Path.exists(csv_path):
         stock_ids_to_csv(csv_path)
-    return pd.read_csv(csv_path)
+    return pd.read_csv(csv_path).loc[:, '代码']
 
 
 def fecth_and_write_stock_info(stock_id: str, out_csv_path: Path) -> str:
-    info = ak.stock_zh_a_hist_min_em(symbol=stock_id, start_date="2022-09-01 09:00:00", period='5', adjust='')
+    info = ak.stock_zh_a_hist_min_em(symbol=stock_id, start_date="2022-09-01 09:00:00", period='1', adjust='')
     info.to_csv(out_csv_path, index=False)
     return stock_id
 
@@ -42,5 +40,5 @@ def update_historical_cache(stock_ids: pd.Series, out_csv_dir: Path, num_jobs: i
 
 if __name__ == '__main__':
     Path.mkdir(ROOT_DIR, exist_ok=True)
-    ids = fetch_stock_ids(STOCK_IDS_CSV).loc[:, '代码']
+    ids = fetch_stock_ids(STOCK_IDS_CSV)
     update_historical_cache(ids, VOL_CSVS_DIR, num_jobs=100)
