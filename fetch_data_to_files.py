@@ -14,10 +14,14 @@ def stock_ids_to_csv(out_csv_path: Path) -> None:
     df.loc[:, ['代码', '名称']].to_csv(out_csv_path, index=False)
 
 
-def fetch_stock_ids(csv_path: Path, force_update_csv=False) -> pd.DataFrame:
-    if force_update_csv or not Path.exists(csv_path):
+def fetch_stock_id_names(csv_path: Path, force_update=False) -> pd.DataFrame:
+    if force_update or not Path.exists(csv_path):
         stock_ids_to_csv(csv_path)
-    return pd.read_csv(csv_path).loc[:, '代码']
+    return pd.read_csv(csv_path)
+
+
+def fetch_stock_ids(csv_path: Path, force_update=False) -> pd.DataFrame:
+    return fetch_stock_id_names(csv_path, force_update).loc[:, '代码']
 
 
 def fecth_and_write_stock_info(stock_id: str, out_csv_path: Path) -> str:
