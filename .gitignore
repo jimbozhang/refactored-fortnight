@@ -128,9 +128,11 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# Data
+data/
+
 # IDEs
 .vscode/
 
 # Debug
 sandbox.ipynb
-*.csv
