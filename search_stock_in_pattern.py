@@ -15,7 +15,7 @@ def yesterday_exlude_weekend(today: datetime) -> datetime:
             return yesterday
 
 
-def cal_volume_factor(info: pd.DataFrame, time: str = None) -> Tuple[float, float, float]:
+def cal_volume_factor(info: pd.DataFrame, time: str = None) -> Tuple[float, float, float, float, float]:
     '''
     Calculate the rate: (the highest volume of today) / (the highest volume of yesterday)
 
@@ -32,26 +32,27 @@ def cal_volume_factor(info: pd.DataFrame, time: str = None) -> Tuple[float, floa
     today = datetime.fromisoformat(today)
     yesterday = yesterday_exlude_weekend(today)
 
-    max_vol_today = 0
-    max_vol_yesterday = 0
-    for time, volume in info[['时间', '成交量']].values:
+    max_vol_today, max_vol_yesterday, last_price_yesterday, init_price_today = 0, 0, 0, 0
+    for time, volume, init_price, last_price in info[['时间', '成交量', '开盘', '收盘']].values:
         time = datetime.fromisoformat(time)
         if time.date() == yesterday.date():
             if volume > max_vol_yesterday:
                 max_vol_yesterday = volume
-        if time.date() == today.date():
-            if volume > max_vol_today:
-                max_vol_today = volume
+                last_price_yesterday = last_price
+        if time.date() == today.date() and time.hour() == 9 and time.minute() == 31:
+            max_vol_today = volume
+            init_price_today = init_price
 
     rate = max_vol_today / max_vol_yesterday if max_vol_yesterday != 0 else 1
-    return max_vol_yesterday, max_vol_today, rate
+    return rate, max_vol_yesterday, max_vol_today, last_price_yesterday, init_price_today
 
 
 def make_report(ids: pd.DataFrame, csv_dir: Path, time: str = None) -> pd.DataFrame:
-    report = pd.DataFrame(columns=['股票代码', '股票名称', '昨天最高成交', '今天最高成交', '倍数'])
+    report = pd.DataFrame(columns=['股票代码', '股票名称', '目标倍数', '昨天最高成交', '今天第一分钟成交', '昨日收盘价', '今日开盘价'])
     for id, name in ids.values:
         csv_path = csv_dir / f'{id}.csv'
-        report.loc[len(report.index)] = [id, name] + list(cal_volume_factor(pd.read_csv(csv_path), time))
+        info = pd.read_csv(csv_path)
+        report.loc[len(report.index)] = [id, name] + list(cal_volume_factor(info, time))
 
     return report.sort_values(by='倍数', ascending=False)
 
