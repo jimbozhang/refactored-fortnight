@@ -1,3 +1,5 @@
+import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Tuple
@@ -9,8 +11,9 @@ from paths import STOCK_IDS_CSV, VOL_CSVS_DIR
 
 
 def yesterday_exlude_weekend(today: datetime) -> datetime:
+    yesterday = today
     while True:
-        yesterday = today - timedelta(days=1)
+        yesterday -= timedelta(days=1)
         if yesterday.weekday() < 5:
             return yesterday
 
@@ -27,6 +30,8 @@ def cal_volume_factor(info: pd.DataFrame, time: str = None) -> Tuple[float, floa
             the highest volume of today
             the highest volume of yesterday
             rate of the above
+            the last price of yesterday
+            the init_price_today
     '''
     today = time if time is not None else datetime.now().isoformat(" ", "seconds")
     today = datetime.fromisoformat(today)
@@ -39,7 +44,7 @@ def cal_volume_factor(info: pd.DataFrame, time: str = None) -> Tuple[float, floa
             if volume > max_vol_yesterday:
                 max_vol_yesterday = volume
                 last_price_yesterday = last_price
-        if time.date() == today.date() and time.hour() == 9 and time.minute() == 31:
+        if time.date() == today.date() and time.hour == 9 and time.minute == 31:
             max_vol_today = volume
             init_price_today = init_price
 
@@ -47,17 +52,31 @@ def cal_volume_factor(info: pd.DataFrame, time: str = None) -> Tuple[float, floa
     return rate, max_vol_yesterday, max_vol_today, last_price_yesterday, init_price_today
 
 
-def make_report(ids: pd.DataFrame, csv_dir: Path, time: str = None) -> pd.DataFrame:
-    report = pd.DataFrame(columns=['股票代码', '股票名称', '目标倍数', '昨天最高成交', '今天第一分钟成交', '昨日收盘价', '今日开盘价'])
-    for id, name in ids.values:
-        csv_path = csv_dir / f'{id}.csv'
-        info = pd.read_csv(csv_path)
-        report.loc[len(report.index)] = [id, name] + list(cal_volume_factor(info, time))
+def worker_searching(csv_path: Path, id: int, name: str, time: None):
+    info = pd.read_csv(csv_path)
+    searching_result = cal_volume_factor(info, time)
+    return [id, name] + list(searching_result)
 
-    return report.sort_values(by='倍数', ascending=False)
+
+def make_report(ids: pd.DataFrame, csv_dir: Path, time: str = None, num_jobs: int = -1) -> pd.DataFrame:
+    if num_jobs < 0:
+        num_jobs = os.cpu_count()
+    futures = []
+
+    with ThreadPoolExecutor(max_workers=num_jobs) as executor:
+        for id, name in ids.values:
+            csv_path = csv_dir / f'{id}.csv'
+            futures.append(executor.submit(worker_searching, csv_path, id, name, time))
+
+    report = pd.DataFrame(columns=['股票代码', '股票名称', '目标倍数', '昨天最高成交', '今天第一分钟成交', '昨日收盘价', '今日开盘价'])
+    for future in as_completed(futures):
+        result = future.result()
+        report.loc[len(report.index)] = result
+
+    return report.sort_values(by='目标倍数', ascending=False)
 
 
 if __name__ == '__main__':
     ids = fetch_stock_id_names(STOCK_IDS_CSV)
-    report = make_report(ids, VOL_CSVS_DIR, time='2022-09-02 09:42:05')
-    report.to_csv('output.csv')
+    report = make_report(ids, VOL_CSVS_DIR, time=None, num_jobs=-1)
+    report.to_csv('report.csv')
